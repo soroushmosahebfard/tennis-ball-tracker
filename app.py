@@ -1,98 +1,79 @@
 import tkinter as tk
-from tkinter import Label, Button
+from tkinter import Canvas, Label, Button
 from PIL import Image, ImageTk, ImageSequence
 import cv2
 import threading
-import numpy as np
+import time
 
-class TennisBallApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Tennis Ball Tracker")
-        self.root.geometry("700x600")
-        self.root.configure(bg='black')
+# ==== GIF Handling Thread Class ====
+class AnimatedGIF(Label):
+    def __init__(self, master, path, delay=100):
+        im = Image.open(path)
+        seq = []
+        try:
+            while True:
+                seq.append(im.copy())
+                im.seek(len(seq))  # Skip to next frame
+        except EOFError:
+            pass
+        self.frames = [ImageTk.PhotoImage(img.resize((200, 200))) for img in seq]
+        self.delay = delay
+        self.idx = 0
+        Label.__init__(self, master, image=self.frames[0], bg='black')
+        self.after(self.delay, self.play)
 
-        # Create canvas for OpenCV feed
-        self.canvas = tk.Canvas(self.root, width=640, height=480, bg='black')
-        self.canvas.pack(pady=20)
+    def play(self):
+        self.configure(image=self.frames[self.idx])
+        self.idx = (self.idx + 1) % len(self.frames)
+        self.after(self.delay, self.play)
 
-        # Load the tennis ball spinning animation
-        self.label = Label(self.root, bg='black')
-        self.label.place(x=280, y=180)
-        self.load_animation("assets/tennis.gif")
-
-        # Start button (hidden initially)
-        self.start_btn = Button(self.root, text="Start", font=("Helvetica", 14), command=self.start_tracking)
-        self.start_btn.place(x=320, y=500)
-        self.start_btn.lower()  # Hide at start
-
-        # Watermark
-        self.watermark = Label(self.root, text="SOROUSH", font=("Helvetica", 10, "italic"),
-                               fg='white', bg='black')
-        self.watermark.place(x=10, y=560)
-
-        # Fade-in start button after 2 sec
-        self.root.after(2000, lambda: self.start_btn.lift())
-
-    def load_animation(self, path):
-        """Load and animate the spinning tennis ball GIF."""
-        self.img = Image.open(path)
-        self.frames = [ImageTk.PhotoImage(frame.copy().convert("RGBA")) for frame in ImageSequence.Iterator(self.img)]
-        self.frame_idx = 0
-        self.animate()
-
-    def animate(self):
-        """Play the tennis ball GIF in a loop."""
-        self.label.configure(image=self.frames[self.frame_idx])
-        self.frame_idx = (self.frame_idx + 1) % len(self.frames)
-        self.root.after(100, self.animate)
-
-    def start_tracking(self):
-        """Start the ball tracking when 'Start' is clicked."""
-        self.label.destroy()
-        self.start_btn.destroy()
-        threading.Thread(target=self.video_loop).start()
-
-    def video_loop(self):
-        """The OpenCV camera and ball tracking logic."""
-        cap = cv2.VideoCapture(0)
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-
-            frame = cv2.flip(frame, 1)  # Mirror the feed
-            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-
-            # Define tennis ball HSV color range
-            lower = np.array([29, 86, 6])
-            upper = np.array([64, 255, 255])
-
-            mask = cv2.inRange(hsv, lower, upper)
-            mask = cv2.erode(mask, None, iterations=2)
-            mask = cv2.dilate(mask, None, iterations=2)
-            cnts, _ = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-            # Draw circles around detected balls
+# ==== OpenCV Tracking ====
+def start_tracking(window):
+    cap = cv2.VideoCapture(1)
+    lower = (29, 86, 6)
+    upper = (64, 255, 255)
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        blurred = cv2.GaussianBlur(frame, (11, 11), 0)
+        hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, lower, upper)
+        mask = cv2.erode(mask, None, iterations=2)
+        mask = cv2.dilate(mask, None, iterations=2)
+        cnts, _ = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if cnts:
             for c in cnts:
                 ((x, y), radius) = cv2.minEnclosingCircle(c)
                 if radius > 10:
                     cv2.circle(frame, (int(x), int(y)), int(radius), (0, 255, 255), 2)
+        cv2.imshow("Tennis Ball Tracker", frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+    cap.release()
+    cv2.destroyAllWindows()
 
-            # Add watermark to OpenCV feed
-            cv2.putText(frame, "SOROUSH", (10, frame.shape[0] - 10),
-                        cv2.FONT_HERSHEY_TRIPLEX, 0.5, (255, 255, 255), 1)
+# ==== GUI Setup ====
+def run_gui():
+    root = tk.Tk()
+    root.title("Tennis Ball Tracker")
+    root.geometry("500x500")
+    root.configure(bg="black")
 
-            # Convert OpenCV frame to Tkinter-compatible format
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            img = Image.fromarray(frame)
-            imgtk = ImageTk.PhotoImage(image=img)
-            self.canvas.create_image(0, 0, anchor='nw', image=imgtk)
-            self.canvas.imgtk = imgtk
+    # Add watermark
+    Label(root, text="SOROUSH", fg="white", font=("Helvetica", 8, "italic"), bg="black").place(x=10, y=475)
 
-        cap.release()
+    # Add animated GIF
+    gif = AnimatedGIF(root, "assets/tennis.gif", delay=80)
+    gif.place(x=150, y=100)
 
-# Launch the app
-root = tk.Tk()
-app = TennisBallApp(root)
-root.mainloop()
+    # Add start button with fade-in effect
+    def show_button():
+        start_btn.place(relx=0.5, rely=0.75, anchor=tk.CENTER)
+
+    start_btn = Button(root, text="Start", command=lambda: threading.Thread(target=start_tracking, args=(root,), daemon=True).start())
+    root.after(2000, show_button)
+
+    root.mainloop()
+
+run_gui()
