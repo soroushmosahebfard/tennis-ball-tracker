@@ -1,79 +1,79 @@
 import tkinter as tk
-from tkinter import Canvas, Label, Button
+from tkinter import ttk
 from PIL import Image, ImageTk, ImageSequence
 import cv2
 import threading
-import time
 
-# ==== GIF Handling Thread Class ====
-class AnimatedGIF(Label):
-    def __init__(self, master, path, delay=100):
-        im = Image.open(path)
-        seq = []
-        try:
+class TennisBallTrackerApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Tennis Ball Tracker")
+        self.root.configure(bg="black")
+        self.root.geometry("600x500")
+        self.root.resizable(False, False)
+
+        # Canvas for video feed
+        self.canvas = tk.Canvas(root, width=600, height=400, bg="black", highlightthickness=1, highlightbackground="white")
+        self.canvas.pack()
+
+        # Copyright
+        self.copyright = tk.Label(root, text="SOROUSH", font=("Arial", 9, "italic"),
+                                  fg="white", bg="black")
+        self.copyright.place(x=10, y=480)
+
+        # Load and animate GIF
+        self.gif = Image.open("tennis.gif")
+        self.frames = [ImageTk.PhotoImage(img.resize((150, 150))) for img in ImageSequence.Iterator(self.gif)]
+        self.gif_index = 0
+        self.label_gif = tk.Label(root, bg="black")
+        self.label_gif.place(relx=0.5, rely=0.5, anchor="center")
+        self.animate_gif()
+
+        # Start button (fade-in after 2 seconds)
+        self.start_button = ttk.Button(root, text="Start", command=self.start_app)
+        self.root.after(2000, lambda: self.start_button.place(relx=0.5, rely=0.85, anchor="center"))
+
+    def animate_gif(self):
+        self.label_gif.configure(image=self.frames[self.gif_index])
+        self.gif_index = (self.gif_index + 1) % len(self.frames)
+        self.root.after(100, self.animate_gif)
+
+    def start_app(self):
+        self.label_gif.destroy()
+        self.start_button.destroy()
+        self.track_tennis_ball()
+
+    def track_tennis_ball(self):
+        cap = cv2.VideoCapture(1)  # change index if needed
+        lower = (29, 86, 30)
+        upper = (64, 255, 255)
+
+        def loop():
             while True:
-                seq.append(im.copy())
-                im.seek(len(seq))  # Skip to next frame
-        except EOFError:
-            pass
-        self.frames = [ImageTk.PhotoImage(img.resize((200, 200))) for img in seq]
-        self.delay = delay
-        self.idx = 0
-        Label.__init__(self, master, image=self.frames[0], bg='black')
-        self.after(self.delay, self.play)
+                ret, frame = cap.read()
+                if not ret:
+                    continue
+                frame = cv2.resize(frame, (600, 400))
+                hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+                mask = cv2.inRange(hsv, lower, upper)
+                mask = cv2.erode(mask, None, iterations=2)
+                mask = cv2.dilate(mask, None, iterations=2)
+                contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    def play(self):
-        self.configure(image=self.frames[self.idx])
-        self.idx = (self.idx + 1) % len(self.frames)
-        self.after(self.delay, self.play)
+                for c in contours:
+                    ((x, y), radius) = cv2.minEnclosingCircle(c)
+                    if radius > 10:
+                        cv2.circle(frame, (int(x), int(y)), int(radius), (0, 255, 255), 2)
 
-# ==== OpenCV Tracking ====
-def start_tracking(window):
-    cap = cv2.VideoCapture(1)
-    lower = (29, 86, 6)
-    upper = (64, 255, 255)
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        blurred = cv2.GaussianBlur(frame, (11, 11), 0)
-        hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, lower, upper)
-        mask = cv2.erode(mask, None, iterations=2)
-        mask = cv2.dilate(mask, None, iterations=2)
-        cnts, _ = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        if cnts:
-            for c in cnts:
-                ((x, y), radius) = cv2.minEnclosingCircle(c)
-                if radius > 10:
-                    cv2.circle(frame, (int(x), int(y)), int(radius), (0, 255, 255), 2)
-        cv2.imshow("Tennis Ball Tracker", frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-    cap.release()
-    cv2.destroyAllWindows()
+                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                img = ImageTk.PhotoImage(Image.fromarray(rgb))
+                self.canvas.imgtk = img
+                self.canvas.create_image(0, 0, anchor="nw", image=img)
 
-# ==== GUI Setup ====
-def run_gui():
+        threading.Thread(target=loop, daemon=True).start()
+
+
+if __name__ == "__main__":
     root = tk.Tk()
-    root.title("Tennis Ball Tracker")
-    root.geometry("500x500")
-    root.configure(bg="black")
-
-    # Add watermark
-    Label(root, text="SOROUSH", fg="white", font=("Helvetica", 8, "italic"), bg="black").place(x=10, y=475)
-
-    # Add animated GIF
-    gif = AnimatedGIF(root, "assets/tennis.gif", delay=80)
-    gif.place(x=150, y=100)
-
-    # Add start button with fade-in effect
-    def show_button():
-        start_btn.place(relx=0.5, rely=0.75, anchor=tk.CENTER)
-
-    start_btn = Button(root, text="Start", command=lambda: threading.Thread(target=start_tracking, args=(root,), daemon=True).start())
-    root.after(2000, show_button)
-
+    app = TennisBallTrackerApp(root)
     root.mainloop()
-
-run_gui()
