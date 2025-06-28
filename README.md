@@ -2,15 +2,21 @@
 
 A desktop app that detects and tracks tennis balls in real-time using your webcam.
 
-Built with **Python**, **OpenCV**, and **Tkinter**, this app features a stylish animated intro, a clean interface, and easy one-click detection — perfect for testing object tracking or learning computer vision basics.
+Built with:
+- `OpenCV` for real-time computer vision
+- `tkinter` for a user-friendly GUI
+- `Pillow` for animated GIF support
 
 ---
 
-## Features
+## ✅ Features
 
-✅ Detects **multiple** tennis balls using color recognition  
-✅ No coding knowledge required to run  
-✅ Cross-platform — works on Windows, macOS, Linux (with Python installed)
+-  Detects and tracks tennis balls in real-time
+-  Color-based detection using HSV masking
+-  Lets you choose from available webcams
+-  Animated intro screen with fade-in Start button
+-  Highlights detected ball centers with a red dot
+-  Minimal, responsive UI with credit watermark
 
 ---
 
