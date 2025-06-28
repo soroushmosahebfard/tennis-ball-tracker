@@ -16,7 +16,7 @@ class TennisBallTrackerApp:
         self.canvas = tk.Canvas(root, width=600, height=400, bg="black", highlightthickness=1, highlightbackground="white")
         self.canvas.pack()
 
-        # Copyright
+        # Copyright label
         self.copyright = tk.Label(root, text="SOROUSH", font=("Arial", 9, "italic"),
                                   fg="white", bg="black")
         self.copyright.place(x=10, y=480)
@@ -44,7 +44,7 @@ class TennisBallTrackerApp:
         self.track_tennis_ball()
 
     def track_tennis_ball(self):
-        cap = cv2.VideoCapture(1)  # change index if needed
+        cap = cv2.VideoCapture(0)  # Change index if needed
         lower = (29, 86, 30)
         upper = (64, 255, 255)
 
