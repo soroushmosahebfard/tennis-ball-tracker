@@ -3,6 +3,7 @@ from tkinter import ttk
 from PIL import Image, ImageTk, ImageSequence
 import cv2
 import threading
+import sys
 
 class TennisBallTrackerApp:
     def __init__(self, root):
@@ -65,10 +66,14 @@ class TennisBallTrackerApp:
                     if radius > 10:
                         cv2.circle(frame, (int(x), int(y)), int(radius), (0, 255, 255), 2)
 
-                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                img = ImageTk.PhotoImage(Image.fromarray(rgb))
-                self.canvas.imgtk = img
-                self.canvas.create_image(0, 0, anchor="nw", image=img)
+                cv2.imshow("Ball Tracking", frame)
+                if cv2.waitKey(1) & 0xFF == ord('q') or cv2.getWindowProperty("Ball Tracking", cv2.WND_PROP_VISIBLE) < 1:
+                    break
+
+            cap.release()
+            cv2.destroyAllWindows()
+            self.root.quit()
+            sys.exit()
 
         threading.Thread(target=loop, daemon=True).start()
 
